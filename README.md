@@ -1,0 +1,86 @@
+# One question, any engine
+
+A map of UK North Sea energy data with a chat beside it. Ask a question in plain English and Claude writes the spatial analysis in whichever engine you pick: **Turf.js**, **DuckDB Spatial** or **GeoPandas**. The code runs in your browser, the result lands on the map, and you can open the code underneath each answer.
+
+The point: once AI is the interface, the tool doing the heavy lifting becomes a choice, not a lock-in. Same question, three engines, three completely different bits of code, same answer.
+
+Everything runs client-side on GitHub Pages. The only server is a small Cloudflare Worker that holds the Claude API key.
+
+## Run it locally
+
+```bash
+python3 -m http.server 8000
+# open http://localhost:8000
+```
+
+Without a Claude connection it runs in **examples mode**: the four example questions run pre-written code on the selected engine, labelled as such. Click ⚙ to paste your own API key and chat live.
+
+## Put it on GitHub Pages
+
+1. Create a repo (e.g. `pushpingeo/north-sea-geo-demo`) and push this folder to it.
+2. Repo **Settings → Pages**: deploy from the `main` branch, root folder.
+3. It'll be at `https://pushpingeo.github.io/north-sea-geo-demo/`.
+
+## Connect Claude (about 15 minutes)
+
+Your claude.ai subscription doesn't include API access, so this needs a Claude Console account. Haiku 5.5 costs about a tenth of a cent per question here.
+
+1. **Get a key.** Sign up at [platform.claude.com](https://platform.claude.com), add a few pounds of credit, create an API key, and **set a monthly spend limit** (e.g. $10) in the Console's limits settings. The limit is your real safety net.
+2. **Deploy the Worker** (needs a free Cloudflare account and Node):
+   ```bash
+   cd worker
+   npx wrangler login
+   npx wrangler kv namespace create LIMITS     # paste the id into wrangler.toml
+   npx wrangler secret put ANTHROPIC_API_KEY   # paste your key
+   npx wrangler deploy                         # prints your worker URL
+   ```
+   In `wrangler.toml`, set `ALLOWED_ORIGINS` to your Pages address (`https://pushpingeo.github.io`). Add `,http://localhost:8000` while testing.
+3. **Point the site at it.** Put the worker URL in `js/config.js` as `proxyUrl` and push.
+
+The Worker only accepts requests from your site, pins the model to Haiku, caps response length, and limits each visitor to 60 requests a day (a question is usually 2 or 3 requests) and everyone together to 3,000. When a limit is hit, the page drops back to examples mode instead of breaking.
+
+## How it fits together
+
+```
+index.html          map (MapLibre) + chat
+js/app.js           Claude tool loop, map, chat UI
+js/claude.js        talks to the Worker (or Anthropic directly with a visitor's own key)
+js/engines/*.js     one file per engine: load(), run(code), and a short guide for Claude
+js/examples.js      example questions with pre-written code for each engine
+data/               GeoJSON + layers.json, built by scripts/prepare_data.py
+worker/             Cloudflare Worker that holds the API key
+```
+
+Claude gets a single tool, `run_analysis(code)`. The system prompt tells it which engine is selected, how that engine wants its code (a JS function body, one SQL query, or Python setting `result`), and the schema of every layer. Each engine returns the same thing: features for the map, a table, or a single value. Claude only sees a short summary of the result; the visitor sees all of it on the map.
+
+**Adding an engine** is one file with `load(layers)`, `run(code)` and a `guide` string, plus one line in `app.js`. Obvious next candidates: [Apache Sedona](https://sedona.apache.org/) behind an API, PostGIS via a small server, or geo-arrow / [GeoRust](https://georust.org/) in WebAssembly.
+
+## Data
+
+| Layer | Source | Notes |
+|---|---|---|
+| Petroleum licences | NSTA | Current offshore production licences |
+| Oil & gas fields | NSTA | Field outlines |
+| Offshore wind sites | Crown Estate Scotland, The Crown Estate | `capacity_mw` only for Scottish sites |
+| Pipelines | NSTA | 5 km and longer only (933 of ~9,000), simplified |
+| Platforms & FPSOs | NSTA | Surface installations |
+| Wells | NSTA | Wellbore top holes; sidetracks share a location |
+
+Refresh with `python3 scripts/prepare_data.py` (standard library only). Field names are renamed to plain snake_case so every engine sees the same columns. Check each publisher's licence terms before reusing the data. NSTA publishes its open data under the Open Government Licence.
+
+## Things worth knowing
+
+- **First load.** Turf is instant. DuckDB downloads about 15 MB (including its spatial extension from `extensions.duckdb.org`). GeoPandas downloads about 30 MB and takes around 8 seconds the first time. After that, everything's cached.
+- **GeoPandas projections.** pyproj's transform calls crash Pyodide in Chrome (they work in Node). So in the browser, `to_crs` is replaced with a numpy implementation of WGS84 ↔ British National Grid (and Web Mercator) in `js/engines/bng.py`. It matches pyproj to the millimetre west of 2°E. East of 2°E pyproj drops the datum shift, because that's outside the EPSG transformation's area of use, so positions there differ by ~140 m. This version doesn't have that jump. If Python crashes anyway, the engine restarts itself on the next run.
+- **Engines can disagree at the edges**, which is part of the story. Turf measures on the sphere; DuckDB and GeoPandas measure in British National Grid. On "producing fields within 20 km of a wind site", Turf and DuckDB say 115 and GeoPandas says 114. The odd one out is Pierce, which sits right on the 20 km line just east of 2°E: 19,869 m with pyproj's datum handling, 20,000 m with the consistent one.
+- **Generated code runs in the visitor's own browser tab.** It can't reach the API key (that's in the Worker) or anyone else's session.
+
+## What was tested
+
+- All four examples on all three engines give the same answers, apart from the edge case above. Checked with Turf in Node, DuckDB 1.5.4 (the version inside the DuckDB WASM build) and GeoPandas.
+- In headless Chrome:
+  - the full page in examples mode, on Turf and GeoPandas;
+  - live mode end to end against a mocked Claude API: tool call, engine run, map update and final answer;
+  - error handling, Python crash recovery, and a phone-sized layout.
+- **Not tested in a browser:** DuckDB's spatial functions. The sandbox it was built in couldn't reach `extensions.duckdb.org`. Everything up to that point was tested, including loading all layers. Do one live check after deploying.
+- **Not tested against the real Claude API.** That needs your key.

@@ -1,0 +1,45 @@
+[
+  {
+    "id": "licences",
+    "name": "Petroleum licences",
+    "file": "licences.geojson",
+    "color": "#7b6fa6",
+    "hidden": true,
+    "description": "Current (extant) UKCS offshore production licences (NSTA)."
+  },
+  {
+    "id": "fields",
+    "name": "Oil & gas fields",
+    "file": "fields.geojson",
+    "color": "#2f7d55",
+    "description": "Offshore hydrocarbon field outlines (NSTA)."
+  },
+  {
+    "id": "wind",
+    "name": "Offshore wind sites",
+    "file": "wind.geojson",
+    "color": "#1c7ed6",
+    "description": "Offshore wind lease and agreement areas (Crown Estate Scotland; The Crown Estate). capacity_mw is only given for Scottish sites."
+  },
+  {
+    "id": "pipelines",
+    "name": "Pipelines (5 km+)",
+    "file": "pipelines.geojson",
+    "color": "#495057",
+    "description": "Offshore pipelines at least 5 km long, simplified (NSTA)."
+  },
+  {
+    "id": "platforms",
+    "name": "Platforms & FPSOs",
+    "file": "platforms.geojson",
+    "color": "#c92a2a",
+    "description": "Offshore surface installations (NSTA)."
+  },
+  {
+    "id": "wells",
+    "name": "Wells",
+    "file": "wells.geojson",
+    "color": "#f08c00",
+    "description": "Offshore wellbore top-hole locations (NSTA). One point per wellbore, so sidetracks share a location."
+  }
+]

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>One question, any engine · North Sea map chat</title>
+  <meta name="description" content="Ask questions of North Sea energy data in plain English. Claude writes the analysis in Turf.js, DuckDB or GeoPandas: you choose the engine.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.1/dist/maplibre-gl.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>One question, any engine</h1>
+      <p>Claude writes the spatial analysis. You choose what runs it.</p>
+    </div>
+    <div class="controls">
+      <label class="engine">
+        <span>Engine</span>
+        <select id="engine" aria-label="Analysis engine"></select>
+      </label>
+      <div class="engine-info">
+        <div id="engine-status" class="status">Starting...</div>
+        <div id="engine-blurb" class="blurb"></div>
+      </div>
+      <span id="mode" class="mode">...</span>
+      <button id="gear" class="icon" title="Settings" aria-label="Settings">⚙</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="map-wrap">
+      <div id="map"></div>
+      <details id="legend" class="legend" open><summary>Layers</summary><div class="items"></div></details>
+    </section>
+
+    <section class="chat">
+      <div id="log" class="log" aria-live="polite"></div>
+      <div id="examples" class="examples"></div>
+      <form id="ask" class="ask">
+        <textarea id="input" rows="2" placeholder="Ask about the wells, pipelines, licences or wind farms..."></textarea>
+        <div class="ask-row">
+          <button type="button" id="clear" class="ghost">New chat</button>
+          <button type="submit" id="send">Ask</button>
+        </div>
+      </form>
+      <footer>
+        Data: <a href="https://opendata-nstauthority.hub.arcgis.com/" target="_blank" rel="noopener">NSTA</a>,
+        <a href="https://www.crownestatescotland.com/" target="_blank" rel="noopener">Crown Estate Scotland</a>,
+        <a href="https://www.thecrownestate.co.uk/" target="_blank" rel="noopener">The Crown Estate</a>
+        (open data, simplified). Built by <span id="author"></span>.
+      </footer>
+    </section>
+  </main>
+
+  <dialog id="settings">
+    <form method="dialog">
+      <h2>Use your own Claude API key</h2>
+      <p>Optional. Your key stays in this browser tab and goes straight to Anthropic. It isn't sent anywhere else.
+        Get one at <a href="https://platform.claude.com/" target="_blank" rel="noopener">platform.claude.com</a>.</p>
+      <input id="key" type="password" placeholder="sk-ant-..." autocomplete="off">
+      <div class="ask-row">
+        <button type="submit" id="key-clear" class="ghost" value="clear">Remove key</button>
+        <button type="submit" id="key-save" value="save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
