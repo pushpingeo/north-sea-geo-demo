@@ -277,8 +277,9 @@ ${state.schema}
 Turn the visitor's latest question into a spec. Say:
 - which layer or layers, and the exact filter values (use the field values listed above, e.g. status = 'ACTIVE')
 - any distance or area threshold, with units. Distances are measured to the outline of a feature. If the visitor says "near" with no number, use 10 km and say so.
-- what to return: either features to draw (which layer's features, and which properties to keep, giving names to any new ones) or a table (named columns, sort order and limit; default top 10)
-Two or three sentences of plain English. No code.
+- what to return. If the answer is a set of places (wells, fields, platforms, sites, pipelines), draw those features on the map and carry any counts, distances or names as properties. Only return a table for rankings or totals that group many features (named columns, sort order and limit; default top 10).
+Don't name a projection, CRS, library or measuring method. Each engine measures distance and area its own way, and that difference is part of what visitors compare.
+Keep it to two or three sentences of plain English. No code.
 Use earlier turns to resolve follow-ups like "now just the gas ones" into a complete spec.
 Text values are mostly UPPER CASE in the data; match names case-insensitively.
 Reply with <spec>...</spec> and nothing else. If these layers can't answer the question, reply <cannot>one sentence on why, then one question they could answer</cannot>.
@@ -310,6 +311,26 @@ function dropOldThinking(history) {
     if (m.role !== "assistant" || !Array.isArray(m.content)) return m;
     const content = m.content.filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking");
     return { ...m, content: content.length ? content : [{ type: "text", text: "(no reply)" }] };
+  });
+}
+
+// Every tool call must be answered by a tool result in the very next message,
+// or the API rejects the whole conversation. If an earlier exchange was cut
+// short, drop the unanswered calls rather than let one glitch break the thread.
+function repair(history) {
+  return history.map((m, i) => {
+    if (m.role !== "assistant" || !Array.isArray(m.content)) return m;
+    const ids = m.content.filter((b) => b.type === "tool_use").map((b) => b.id);
+    if (!ids.length) return m;
+    const next = history[i + 1];
+    const answered = new Set(
+      next && next.role === "user" && Array.isArray(next.content)
+        ? next.content.filter((b) => b.type === "tool_result").map((b) => b.tool_use_id)
+        : []
+    );
+    if (ids.every((id) => answered.has(id))) return m;
+    const text = m.content.filter((b) => b.type === "text");
+    return { ...m, content: text.length ? text : [{ type: "text", text: "(stopped before running)" }] };
   });
 }
 
@@ -357,7 +378,8 @@ async function runThread(id, question, spec, round) {
     return null;
   }
 
-  t.history = trim(dropOldThinking(t.history));
+  t.history = repair(trim(dropOldThinking(t.history)));
+  const before = t.history.length;
   t.history.push({ role: "user", content: `Visitor's question: ${question}\n\nSpec to implement exactly: ${spec}` });
   let last = null;
   try {
@@ -393,7 +415,9 @@ async function runThread(id, question, spec, round) {
       t.history.push({ role: "user", content: results });
     }
   } catch (e) {
-    while (t.history.length && t.history.at(-1).role === "user") t.history.pop();
+    // Roll the thread back to before this question, so a half-finished
+    // exchange can't break the next one.
+    t.history = t.history.slice(0, before);
     t.phase = "error";
     renderTab(id);
     if (e instanceof LimitReached) throw e;

@@ -125,12 +125,15 @@ function compareTables(ids, results, labels) {
     const present = vals.filter((v) => v !== undefined);
     const nums = present.filter((v) => typeof v === "number");
     let gap = 0;
+    let absGap = 0;
     if (nums.length > 1) {
       const lo = Math.min(...nums), hi = Math.max(...nums);
-      gap = hi === 0 ? 0 : (hi - lo) / Math.abs(hi);
+      absGap = hi - lo;
+      gap = hi === 0 ? 0 : absGap / Math.abs(hi);
       worst = Math.max(worst, gap);
     }
-    const cls = present.length < ids.length || gap > CLOSE ? "bad" : gap > AGREE ? "close" : "";
+    // Small rounded numbers (0.4 km vs 0.5 km) are a rounding difference, not a disagreement.
+    const cls = present.length < ids.length || (gap > CLOSE && absGap > 0.15) ? "bad" : gap > AGREE ? "close" : "";
     if (cls === "bad") disagreements++;
     if (cls === "close") close++;
     return `<tr class="${cls}"><td>${esc(k)}</td>${vals
