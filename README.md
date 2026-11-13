@@ -1,8 +1,13 @@
-# One question, any engine
+# One question, three engines
 
-A map of UK North Sea energy data with a chat beside it. Ask a question in plain English and Claude writes the spatial analysis in whichever engine you pick: **Turf.js**, **DuckDB Spatial** or **GeoPandas**. The code runs in your browser, the result lands on the map, and you can open the code underneath each answer.
+A map of UK North Sea energy data with a question box on top. Ask something in plain English and:
 
-The point: once AI is the interface, the tool doing the heavy lifting becomes a choice, not a lock-in. Same question, three engines, three completely different bits of code, same answer.
+1. Claude turns it into a precise **spec**: which layers, exact filters, thresholds, what to return.
+2. Claude then implements that spec three times, in **Turf.js**, **DuckDB Spatial** and **GeoPandas**, all at once. The code runs in your browser.
+3. Each engine gets its own tab showing its code, timing and answer, and the map shows its result.
+4. **Compare** puts all three on the map as nested rings and lists any disagreements in red.
+
+The point: once AI is the interface, the tool doing the heavy lifting becomes a choice, not a lock-in. The spec step matters because without it Claude might read "near" as 10 km for one engine and 20 km for another. With it, any difference left over comes from the engines themselves. Usually they agree. Sometimes they don't, and that's the interesting part: on acreage, for example, Turf measures on the sphere and the others on British National Grid, so the totals differ by about half a percent.
 
 Everything runs client-side on GitHub Pages. The only server is a small Cloudflare Worker that holds the Claude API key.
 
@@ -13,7 +18,7 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-Without a Claude connection it runs in **examples mode**: the four example questions run pre-written code on the selected engine, labelled as such. Click ⚙ to paste your own API key and chat live.
+Without a Claude connection it runs in **examples mode**: the five example questions run pre-written code on all three engines, labelled as such. Click ⚙ to paste your own API key and ask live.
 
 ## Put it on GitHub Pages
 
@@ -23,7 +28,7 @@ Without a Claude connection it runs in **examples mode**: the four example quest
 
 ## Connect Claude (about 15 minutes)
 
-Your claude.ai subscription doesn't include API access, so this needs a Claude Console account. Haiku 5.5 costs about a tenth of a cent per question here.
+Your claude.ai subscription doesn't include API access, so this needs a Claude Console account. With Haiku 5.5, a question (spec plus three engines) costs around a penny.
 
 1. **Get a key.** Sign up at [platform.claude.com](https://platform.claude.com), add a few pounds of credit, create an API key, and **set a monthly spend limit** (e.g. $10) in the Console's limits settings. The limit is your real safety net.
 2. **Deploy the Worker** (needs a free Cloudflare account and Node):
@@ -37,23 +42,27 @@ Your claude.ai subscription doesn't include API access, so this needs a Claude C
    In `wrangler.toml`, set `ALLOWED_ORIGINS` to your Pages address (`https://pushpingeo.github.io`). Add `,http://localhost:8000` while testing.
 3. **Point the site at it.** Put the worker URL in `js/config.js` as `proxyUrl` and push.
 
-The Worker only accepts requests from your site, pins the model to Haiku, caps response length, and limits each visitor to 60 requests a day (a question is usually 2 or 3 requests) and everyone together to 3,000. When a limit is hit, the page drops back to examples mode instead of breaking.
+The Worker only accepts requests from your site, pins the model to Haiku, caps response length, and limits each visitor to 200 requests a day (a question is roughly 7 to 10 requests, so about 20 to 25 questions) and everyone together to 5,000. If you set the Worker up in the Cloudflare dashboard, change `PER_VISITOR_DAILY` and `TOTAL_DAILY` there. When a limit is hit, the page drops back to examples mode instead of breaking, and an example clicked at that moment runs its pre-written version.
 
 ## How it fits together
 
 ```
-index.html          map (MapLibre) + chat
-js/app.js           Claude tool loop, map, chat UI
+index.html          question bar, map (MapLibre), engine tabs
+js/app.js           spec step, three parallel Claude tool loops, map, UI
+js/compare.js       compares the three results (features, tables or single values)
 js/claude.js        talks to the Worker (or Anthropic directly with a visitor's own key)
 js/engines/*.js     one file per engine: load(), run(code), and a short guide for Claude
-js/examples.js      example questions with pre-written code for each engine
+js/engines/bng.py   WGS84 <-> British National Grid for GeoPandas in the browser (see below)
+js/examples.js      five industry questions, each with a spec and pre-written code for every engine
 data/               GeoJSON + layers.json, built by scripts/prepare_data.py
 worker/             Cloudflare Worker that holds the API key
 ```
 
-Claude gets a single tool, `run_analysis(code)`. The system prompt tells it which engine is selected, how that engine wants its code (a JS function body, one SQL query, or Python setting `result`), and the schema of every layer. Each engine returns the same thing: features for the map, a table, or a single value. Claude only sees a short summary of the result; the visitor sees all of it on the map.
+First, one Claude call with no tools writes the spec. Then each engine runs its own conversation with Claude. Each has a single tool, `run_analysis(code)`, and a system prompt saying which engine it is, how that engine wants its code (a JS function body, one SQL query, or Python that sets `result`), and the schema of every layer. Every engine returns the same shape: features for the map, a table, or a single value. Claude only sees a short summary of each result; the visitor sees all of it. Follow-up questions work because the spec step and each engine keep their own history.
 
-**Adding an engine** is one file with `load(layers)`, `run(code)` and a `guide` string, plus one line in `app.js`. Obvious next candidates: [Apache Sedona](https://sedona.apache.org/) behind an API, PostGIS via a small server, or geo-arrow / [GeoRust](https://georust.org/) in WebAssembly.
+Compare matches features by an identifying property (well, name and so on) or by location. It treats numbers within 0.1% as the same, within 2% as "close" (shown in amber, usually down to how each engine measures), and anything bigger or missing as a disagreement (red).
+
+**Adding an engine** is one file with `load(layers)`, `run(code)` and a `guide` string, plus one line in `app.js` and a tab in `index.html`. Obvious next candidates: [Apache Sedona](https://sedona.apache.org/) behind an API, PostGIS via a small server, or geo-arrow / [GeoRust](https://georust.org/) in WebAssembly.
 
 ## Data
 
@@ -70,17 +79,17 @@ Refresh with `python3 scripts/prepare_data.py` (standard library only). Field na
 
 ## Things worth knowing
 
-- **First load.** Turf is instant. DuckDB downloads about 15 MB (including its spatial extension from `extensions.duckdb.org`). GeoPandas downloads about 30 MB and takes around 8 seconds the first time. After that, everything's cached.
+- **First load.** Turf is instant. On a desktop, DuckDB (about 15 MB, including its spatial extension from `extensions.duckdb.org`) and GeoPandas (about 30 MB, around 8 seconds) start loading in the background as soon as the map is up. On a phone they load on the first question. After that, everything's cached.
 - **GeoPandas projections.** pyproj's transform calls crash Pyodide in Chrome (they work in Node). So in the browser, `to_crs` is replaced with a numpy implementation of WGS84 ↔ British National Grid (and Web Mercator) in `js/engines/bng.py`. It matches pyproj to the millimetre west of 2°E. East of 2°E pyproj drops the datum shift, because that's outside the EPSG transformation's area of use, so positions there differ by ~140 m. This version doesn't have that jump. If Python crashes anyway, the engine restarts itself on the next run.
-- **Engines can disagree at the edges**, which is part of the story. Turf measures on the sphere; DuckDB and GeoPandas measure in British National Grid. On "producing fields within 20 km of a wind site", Turf and DuckDB say 115 and GeoPandas says 114. The odd one out is Pierce, which sits right on the 20 km line just east of 2°E: 19,869 m with pyproj's datum handling, 20,000 m with the consistent one.
+- **Engines can disagree at the edges**, which is part of the story. Turf measures on the sphere; DuckDB and GeoPandas measure in British National Grid. On the acreage example, Turf has Serica at 2,887 km², DuckDB 2,901 and GeoPandas 2,903. Distance thresholds can flip a feature that sits right on the line. Pierce field, 20 km from a wind site and just east of 2°E, comes out at 19,869 m with pyproj's datum handling and 20,000 m with the consistent one.
 - **Generated code runs in the visitor's own browser tab.** It can't reach the API key (that's in the Worker) or anyone else's session.
 
 ## What was tested
 
-- All four examples on all three engines give the same answers, apart from the edge case above. Checked with Turf in Node, DuckDB 1.5.4 (the version inside the DuckDB WASM build) and GeoPandas.
+- All five examples agree on all three engines, apart from the expected acreage gaps. Checked with Turf in Node, DuckDB 1.5.4 (the version inside the DuckDB WASM build) and GeoPandas.
 - In headless Chrome:
   - the full page in examples mode, on Turf and GeoPandas;
-  - live mode end to end against a mocked Claude API: tool call, engine run, map update and final answer;
+  - live mode end to end against a mocked Claude API: spec step, three engine loops in parallel, follow-up questions, map, Compare;
   - error handling, Python crash recovery, and a phone-sized layout.
 - **Not tested in a browser:** DuckDB's spatial functions. The sandbox it was built in couldn't reach `extensions.duckdb.org`. Everything up to that point was tested, including loading all layers. Do one live check after deploying.
-- **Not tested against the real Claude API.** That needs your key.
+- The Worker has been checked live against the real Claude API.

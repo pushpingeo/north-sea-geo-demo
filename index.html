@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>One question, any engine · North Sea map chat</title>
-  <meta name="description" content="Ask questions of North Sea energy data in plain English. Claude writes the analysis in Turf.js, DuckDB or GeoPandas: you choose the engine.">
+  <title>One question, three engines · North Sea map</title>
+  <meta name="description" content="Ask a question of North Sea energy data in plain English. Claude writes the analysis for Turf.js, DuckDB and GeoPandas, and you compare the three answers.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -15,22 +15,23 @@
 <body>
   <header>
     <div class="brand">
-      <h1>One question, any engine</h1>
-      <p>Claude writes the spatial analysis. You choose what runs it.</p>
+      <h1>One question, three engines</h1>
+      <p>Claude writes the spatial analysis. Turf.js, DuckDB and GeoPandas each run it. You compare.</p>
     </div>
     <div class="controls">
-      <label class="engine">
-        <span>Engine</span>
-        <select id="engine" aria-label="Analysis engine"></select>
-      </label>
-      <div class="engine-info">
-        <div id="engine-status" class="status">Starting...</div>
-        <div id="engine-blurb" class="blurb"></div>
-      </div>
       <span id="mode" class="mode">...</span>
-      <button id="gear" class="icon" title="Settings" aria-label="Settings">⚙</button>
+      <button id="gear" class="icon" title="Use your own API key" aria-label="Settings">⚙</button>
     </div>
   </header>
+
+  <section class="askbar">
+    <form id="ask">
+      <textarea id="input" rows="1" placeholder="Ask about the wells, fields, platforms, pipelines, licences or wind sites..."></textarea>
+      <button type="submit" id="send">Ask</button>
+      <button type="button" id="clear" class="ghost" title="Start again">Clear</button>
+    </form>
+    <div id="examples" class="examples"></div>
+  </section>
 
   <main>
     <section class="map-wrap">
@@ -38,21 +39,29 @@
       <details id="legend" class="legend" open><summary>Layers</summary><div class="items"></div></details>
     </section>
 
-    <section class="chat">
-      <div id="log" class="log" aria-live="polite"></div>
-      <div id="examples" class="examples"></div>
-      <form id="ask" class="ask">
-        <textarea id="input" rows="2" placeholder="Ask about the wells, pipelines, licences or wind farms..."></textarea>
-        <div class="ask-row">
-          <button type="button" id="clear" class="ghost">New chat</button>
-          <button type="submit" id="send">Ask</button>
+    <section class="results">
+      <div id="spec" class="spec" hidden></div>
+      <div id="summary" class="summary"></div>
+      <nav class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="turf"><i class="dot eng-turf on"></i>Turf.js <span class="n"></span></button>
+        <button class="tab" role="tab" data-tab="duckdb"><i class="dot eng-duckdb on"></i>DuckDB <span class="n"></span></button>
+        <button class="tab" role="tab" data-tab="geopandas"><i class="dot eng-geopandas on"></i>GeoPandas <span class="n"></span></button>
+        <button class="tab compare" role="tab" data-tab="compare">Compare</button>
+      </nav>
+      <div class="panels">
+        <div class="panel" id="panel-turf" data-tab="turf"><div class="engine-line status"></div><div class="log"></div></div>
+        <div class="panel" id="panel-duckdb" data-tab="duckdb" hidden><div class="engine-line status"></div><div class="log"></div></div>
+        <div class="panel" id="panel-geopandas" data-tab="geopandas" hidden><div class="engine-line status"></div><div class="log"></div></div>
+        <div class="panel" id="panel-compare" data-tab="compare" hidden>
+          <div class="engine-line">On the map: <span class="key"><i class="ring eng-turf"></i>Turf.js</span> <span class="key"><i class="ring eng-duckdb"></i>DuckDB</span> <span class="key"><i class="dot eng-geopandas on"></i>GeoPandas</span> <span class="key"><i class="dot diff"></i>not found by all three</span></div>
+          <div class="log cmp-body"></div>
         </div>
-      </form>
+      </div>
       <footer>
         Data: <a href="https://opendata-nstauthority.hub.arcgis.com/" target="_blank" rel="noopener">NSTA</a>,
         <a href="https://www.crownestatescotland.com/" target="_blank" rel="noopener">Crown Estate Scotland</a>,
         <a href="https://www.thecrownestate.co.uk/" target="_blank" rel="noopener">The Crown Estate</a>
-        (open data, simplified). Built by <span id="author"></span>.
+        (open data, simplified). Built by <span id="author"></span> · <a href="https://github.com/pushpingeo/north-sea-geo-demo" target="_blank" rel="noopener">source</a>.
       </footer>
     </section>
   </main>
@@ -63,7 +72,7 @@
       <p>Optional. Your key stays in this browser tab and goes straight to Anthropic. It isn't sent anywhere else.
         Get one at <a href="https://platform.claude.com/" target="_blank" rel="noopener">platform.claude.com</a>.</p>
       <input id="key" type="password" placeholder="sk-ant-..." autocomplete="off">
-      <div class="ask-row">
+      <div class="row">
         <button type="submit" id="key-clear" class="ghost" value="clear">Remove key</button>
         <button type="submit" id="key-save" value="save">Save</button>
       </div>

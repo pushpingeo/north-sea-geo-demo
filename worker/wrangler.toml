@@ -6,9 +6,9 @@ compatibility_date = "2026-11-01"
 MODEL = "claude-haiku-5-5"
 # Your GitHub Pages address, no trailing slash. Add http://localhost:8000 for local testing.
 ALLOWED_ORIGINS = "https://pushpingeo.github.io"
-# Each question uses about 2-3 requests (Claude asks, the engine runs, Claude answers).
-PER_VISITOR_DAILY = "60"
-TOTAL_DAILY = "3000"
+# Each question uses about 7-10 requests: one to write the spec, then 2-3 for each engine.
+PER_VISITOR_DAILY = "200"
+TOTAL_DAILY = "5000"
 
 [[kv_namespaces]]
 binding = "LIMITS"
