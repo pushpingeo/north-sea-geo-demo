@@ -16,6 +16,9 @@ In scope:
 - \`turf\`: Turf.js v7 (e.g. turf.buffer, turf.booleanPointInPolygon, turf.distance, turf.length, turf.area, turf.pointsWithinPolygon, turf.nearestPoint).
 \`return\` one of: a FeatureCollection (drawn on the map), an array of plain objects (shown as a table), or a single value.
 Turf distances are in kilometres by default; turf.area returns square metres.
+Layers mix single and Multi geometries (see the counts below). Functions such as turf.along, turf.lineSlice,
+turf.lineSliceAlong, turf.nearestPointOnLine and turf.lineString need single parts: run turf.flatten(feature)
+first and loop over its features. Check geometry.type rather than assuming it.
 No fetch, no DOM, no imports.`,
 
   async load(layers) {

@@ -154,8 +154,10 @@ function describeLayers() {
         const few = vals.length < 12 ? `values: ${vals.join(" | ")}` : `e.g. ${vals.slice(0, 4).join(" | ")}`;
         return `  - ${k} (text; ${few})`;
       });
-      const g = (fc.features.find((f) => f.geometry) || {}).geometry?.type;
-      return `Layer "${L.id}" - ${L.name}: ${fc.features.length} ${g} features. ${L.description || ""}
+      const types = {};
+      for (const f of fc.features) if (f.geometry) types[f.geometry.type] = (types[f.geometry.type] || 0) + 1;
+      const g = Object.entries(types).map(([t, n]) => `${n} ${t}`).join(" + ");
+      return `Layer "${L.id}" - ${L.name}: ${fc.features.length} features (${g}). ${L.description || ""}
 ${lines.join("\n")}`;
     })
     .join("\n\n");
