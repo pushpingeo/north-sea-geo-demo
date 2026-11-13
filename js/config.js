@@ -5,7 +5,7 @@ export const CONFIG = {
   proxyUrl: "https://north-sea-geo-demo.robdunfey.workers.dev",
 
   model: "claude-haiku-5-5",
-  maxTokens: 1500,
+  maxTokens: 8000,
   maxToolRounds: 6,
 
   author: {

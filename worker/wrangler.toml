@@ -4,6 +4,7 @@ compatibility_date = "2026-11-01"
 
 [vars]
 MODEL = "claude-haiku-5-5"
+MAX_TOKENS = "8000"
 # Your GitHub Pages address, no trailing slash. Add http://localhost:8000 for local testing.
 ALLOWED_ORIGINS = "https://pushpingeo.github.io"
 # Each question uses about 7-10 requests: one to write the spec, then 2-3 for each engine.

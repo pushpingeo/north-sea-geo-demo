@@ -42,7 +42,7 @@ Your claude.ai subscription doesn't include API access, so this needs a Claude C
    In `wrangler.toml`, set `ALLOWED_ORIGINS` to your Pages address (`https://pushpingeo.github.io`). Add `,http://localhost:8000` while testing.
 3. **Point the site at it.** Put the worker URL in `js/config.js` as `proxyUrl` and push.
 
-The Worker only accepts requests from your site, pins the model to Haiku, caps response length, and limits each visitor to 200 requests a day (a question is roughly 7 to 10 requests, so about 20 to 25 questions) and everyone together to 5,000. If you set the Worker up in the Cloudflare dashboard, change `PER_VISITOR_DAILY` and `TOTAL_DAILY` there. When a limit is hit, the page drops back to examples mode instead of breaking, and an example clicked at that moment runs its pre-written version.
+The Worker only accepts requests from your site, pins the model to Haiku, caps response length at `MAX_TOKENS` (8,000, enough for Haiku to think and then write code), and limits each visitor to 200 requests a day (a question is roughly 7 to 10 requests, so about 20 to 25 questions) and everyone together to 5,000. If you set the Worker up in the Cloudflare dashboard, change `PER_VISITOR_DAILY` and `TOTAL_DAILY` there. When a limit is hit, the page drops back to examples mode instead of breaking, and an example clicked at that moment runs its pre-written version.
 
 ## How it fits together
 

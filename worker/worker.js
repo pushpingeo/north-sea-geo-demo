@@ -59,7 +59,8 @@ export default {
       },
       body: JSON.stringify({
         model: env.MODEL,
-        max_tokens: Math.min(+body.max_tokens || 1500, 2000),
+        // Haiku thinks before it writes code, so leave room for both.
+        max_tokens: Math.min(+body.max_tokens || 4000, +env.MAX_TOKENS || 8000),
         system: body.system,
         messages: body.messages,
         tools: body.tools,

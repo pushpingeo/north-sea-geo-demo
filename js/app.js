@@ -329,6 +329,9 @@ async function makeSpec(question) {
   try {
     const resp = await callClaude({ system: specPrompt(), messages: state.specHistory });
     const text = resp.content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
+    if (resp.stop_reason === "max_tokens" && !/<\/spec>|<\/cannot>/i.test(text)) {
+      throw new Error("Claude ran out of room while planning. Try a simpler question.");
+    }
     state.specHistory.push({ role: "assistant", content: text || "(no reply)" });
     const spec = text.match(/<spec>([\s\S]*?)<\/spec>/i);
     const cannot = text.match(/<cannot>([\s\S]*?)<\/cannot>/i);
@@ -361,9 +364,17 @@ async function runThread(id, question, spec, round) {
     for (let i = 0; i < CONFIG.maxToolRounds; i++) {
       const resp = await callClaude({ system: enginePrompt(id), messages: t.history, tools: [TOOL] });
       t.history.push({ role: "assistant", content: resp.content });
+      if (resp.stop_reason === "max_tokens") {
+        t.history.pop();
+        addNote(round, "Claude ran out of room before finishing its code (it thinks first, then writes). Try again, or ask a narrower question.");
+        break;
+      }
       for (const b of resp.content) if (b.type === "text" && b.text.trim()) addText(round, b.text);
       const uses = resp.content.filter((b) => b.type === "tool_use");
-      if (resp.stop_reason !== "tool_use" || !uses.length) break;
+      if (resp.stop_reason !== "tool_use" || !uses.length) {
+        if (!last && !resp.content.some((b) => b.type === "text" && b.text.trim())) addNote(round, "Claude finished without running any code.");
+        break;
+      }
 
       const results = [];
       for (const u of uses) {
