@@ -249,7 +249,20 @@ function trimHistory() {
   }
 }
 
+// Claude's thinking blocks are signed against the system prompt they were written
+// under, and the system prompt changes when the engine does. Earlier turns don't
+// need their thinking, so drop it before each new question. Thinking inside the
+// current question's tool loop is kept, as the API requires.
+function dropOldThinking() {
+  state.history = state.history.map((m) => {
+    if (m.role !== "assistant" || !Array.isArray(m.content)) return m;
+    const content = m.content.filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking");
+    return { ...m, content: content.length ? content : [{ type: "text", text: "(no reply)" }] };
+  });
+}
+
 async function askClaude(question) {
+  dropOldThinking();
   state.history.push({ role: "user", content: question });
   trimHistory();
   const thinking = addThinking();
@@ -446,11 +459,13 @@ function buildExamples() {
 async function busy(fn) {
   state.busy = true;
   document.body.classList.add("busy");
+  $("#engine").disabled = true; // the engine can't change halfway through an answer
   try {
     await fn();
   } finally {
     state.busy = false;
     document.body.classList.remove("busy");
+    $("#engine").disabled = false;
   }
 }
 
