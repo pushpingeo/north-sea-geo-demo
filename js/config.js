@@ -2,7 +2,7 @@
 export const CONFIG = {
   // URL of your Cloudflare Worker (see worker/README in the main README).
   // Leave empty and the demo runs in "examples" mode unless a visitor adds their own key.
-  proxyUrl: "",
+  proxyUrl: "https://north-sea-geo-demo.robdunfey.workers.dev",
 
   model: "claude-haiku-5-5",
   maxTokens: 1500,
