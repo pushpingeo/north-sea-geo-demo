@@ -36,7 +36,10 @@ export default {
       const key = `atlas:${day}:${ip}`;
       const used = +(await env.LIMITS.get(key)) || 0;
       if (used >= +(env.ATLAS_PER_VISITOR_DAILY || 2000)) return reply(429, { message: "You've reached today's limit for map searches." });
-      const upstream = await fetch("https://atlas-mcp.robdunfey.workers.dev/mcp", {
+      // A Worker can't fetch another Worker on the same account by its workers.dev address (error 1042),
+      // so the atlas is reached through a service binding called ATLAS.
+      if (!env.ATLAS) return reply(500, { message: "The atlas link isn't set up (service binding ATLAS missing)." });
+      const upstream = await env.ATLAS.fetch("https://atlas-mcp/mcp", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${env.ATLAS_MCP_KEY}` },
         body: JSON.stringify({ jsonrpc: "2.0", id: call.id ?? 1, method: "tools/call", params: { name: call.params.name, arguments: call.params.arguments || {} } }),

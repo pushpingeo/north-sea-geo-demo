@@ -20,3 +20,8 @@ id = "PASTE_THE_ID_FROM_wrangler_kv_namespace_create"
 # The API key is a secret, not a var:
 #   npx wrangler secret put ANTHROPIC_API_KEY
 #   npx wrangler secret put ATLAS_MCP_KEY      (Tobler's /atlas route)
+
+# Tobler's /atlas route reaches the atlas Worker directly (workers.dev fetches between Workers on one account fail with 1042).
+[[services]]
+binding = "ATLAS"
+service = "atlas-mcp"
