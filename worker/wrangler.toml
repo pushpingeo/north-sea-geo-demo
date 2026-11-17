@@ -10,6 +10,8 @@ ALLOWED_ORIGINS = "https://pushpingeo.github.io"
 # Each question uses about 7-10 requests: one to write the spec, then 2-3 for each engine.
 PER_VISITOR_DAILY = "200"
 TOTAL_DAILY = "5000"
+# Tobler's map searches through the atlas (no Anthropic cost; one search is up to ~20 calls).
+ATLAS_PER_VISITOR_DAILY = "2000"
 
 [[kv_namespaces]]
 binding = "LIMITS"
@@ -17,3 +19,4 @@ id = "PASTE_THE_ID_FROM_wrangler_kv_namespace_create"
 
 # The API key is a secret, not a var:
 #   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put ATLAS_MCP_KEY      (Tobler's /atlas route)

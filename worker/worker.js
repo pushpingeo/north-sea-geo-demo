@@ -22,6 +22,28 @@ export default {
 
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
+
+    // Tobler: read-only calls to the AI Living World Atlas, with the atlas key added here so the
+    // page never sees it. Its own daily counter, because one map search makes up to ~20 atlas calls.
+    if (request.method === "POST" && url.pathname === "/atlas") {
+      if (!okOrigin) return reply(403, { message: "This endpoint only serves the demo site." });
+      const ATLAS_TOOLS = new Set(["find_datasets", "get_dataset", "fetch_features", "vocabulary"]);
+      let call;
+      try { call = JSON.parse(await request.text()); } catch { return reply(400, { message: "Bad request" }); }
+      if (call?.method !== "tools/call" || !ATLAS_TOOLS.has(call?.params?.name)) return reply(403, { message: "Not allowed" });
+      const day = new Date().toISOString().slice(0, 10);
+      const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+      const key = `atlas:${day}:${ip}`;
+      const used = +(await env.LIMITS.get(key)) || 0;
+      if (used >= +(env.ATLAS_PER_VISITOR_DAILY || 2000)) return reply(429, { message: "You've reached today's limit for map searches." });
+      const upstream = await fetch("https://atlas-mcp.robdunfey.workers.dev/mcp", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${env.ATLAS_MCP_KEY}` },
+        body: JSON.stringify({ jsonrpc: "2.0", id: call.id ?? 1, method: "tools/call", params: { name: call.params.name, arguments: call.params.arguments || {} } }),
+      });
+      await env.LIMITS.put(key, String(used + 1), { expirationTtl: 60 * 60 * 26 });
+      return new Response(upstream.body, { status: upstream.status, headers: { ...cors, "content-type": "application/json" } });
+    }
     if (request.method !== "POST" || url.pathname !== "/v1/messages") return reply(404, { message: "Not found" });
     if (!okOrigin) return reply(403, { message: "This endpoint only serves the demo site." });
 
