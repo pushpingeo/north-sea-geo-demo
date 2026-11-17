@@ -6,7 +6,7 @@
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const origin = request.headers.get("Origin") || "";
     const allowed = (env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
     const okOrigin = allowed.includes(origin);
@@ -39,12 +39,20 @@ export default {
       // A Worker can't fetch another Worker on the same account by its workers.dev address (error 1042),
       // so the atlas is reached through a service binding called ATLAS.
       if (!env.ATLAS) return reply(500, { message: "The atlas link isn't set up (service binding ATLAS missing)." });
-      const upstream = await env.ATLAS.fetch("https://atlas-mcp/mcp", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${env.ATLAS_MCP_KEY}` },
-        body: JSON.stringify({ jsonrpc: "2.0", id: call.id ?? 1, method: "tools/call", params: { name: call.params.name, arguments: call.params.arguments || {} } }),
-      });
-      await env.LIMITS.put(key, String(used + 1), { expirationTtl: 60 * 60 * 26 });
+      let upstream;
+      try {
+        upstream = await env.ATLAS.fetch("https://atlas-mcp/mcp", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${env.ATLAS_MCP_KEY}` },
+          body: JSON.stringify({ jsonrpc: "2.0", id: call.id ?? 1, method: "tools/call", params: { name: call.params.name, arguments: call.params.arguments || {} } }),
+        });
+      } catch (e) {
+        return reply(502, { message: `The atlas didn't answer: ${String(e.message || e).slice(0, 120)}` });
+      }
+      // Count the call after replying, and never fail the reply over it: Tobler asks ten layers at once, and KV
+      // allows one write a second per key, so most of these writes are refused (the count is approximate).
+      const count = env.LIMITS.put(key, String(used + 1), { expirationTtl: 60 * 60 * 26 }).catch(() => {});
+      if (ctx?.waitUntil) ctx.waitUntil(count);
       return new Response(upstream.body, { status: upstream.status, headers: { ...cors, "content-type": "application/json" } });
     }
     if (request.method !== "POST" || url.pathname !== "/v1/messages") return reply(404, { message: "Not found" });
